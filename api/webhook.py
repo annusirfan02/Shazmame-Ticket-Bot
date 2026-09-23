@@ -13,7 +13,7 @@ load_dotenv()
 
 from flask import Flask, request, jsonify
 
-from lib.freshdesk import get_ticket_details, add_private_note, send_email_reply
+from lib.freshdesk import get_ticket_details, add_private_note, forward_ticket_summary
 from lib.validator import is_target_company, has_escalation_tag
 from lib.summarizer import generate_summary
 
@@ -24,6 +24,8 @@ NEW_TICKET_NOTE = (
     "please add the tag: escalate-unresolved to trigger the escalation process."
 )
 
+ESCALATION_NOTIFY_EMAIL = os.environ.get("ESCALATION_NOTIFY_EMAIL", "annus@mycrmsupport.com")
+
 
 def log(ticket_id, action, description):
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -31,22 +33,19 @@ def log(ticket_id, action, description):
 
 
 def build_summary_email(ticket, summary_text):
-    client_name = (ticket.get("requester") or {}).get("name") or "Customer"
+    requester = ticket.get("requester") or {}
     created_at = ticket.get("created_at", "N/A")
 
     return (
-        f"Dear {client_name},\n\n"
-        "Please find below the summary of your support ticket that requires attention.\n\n"
+        "An escalated ticket requires attention. Please find the details below.\n\n"
         f"Ticket ID: {ticket.get('id')}\n"
         f"Subject: {ticket.get('subject')}\n"
+        f"Requester: {requester.get('name') or 'N/A'} ({requester.get('email') or 'N/A'})\n"
         f"Status: {ticket.get('status')}\n"
         f"Priority: {ticket.get('priority')}\n"
         f"Created: {created_at}\n\n"
-        "Issue Summary:\n"
-        f"{summary_text}\n\n"
-        "Please contact us if you need further assistance.\n\n"
-        "Best regards,\n"
-        "Support Team"
+        "Chat Summary:\n"
+        f"{summary_text}\n"
     )
 
 
@@ -130,14 +129,13 @@ def handle_ticket_updated(ticket_id, payload):
         summary_text = ticket.get("description_text") or ticket.get("description") or ""
 
     email_body = build_summary_email(ticket, summary_text)
-    recipient_email = (ticket.get("requester") or {}).get("email") or "unknown"
 
     try:
-        send_email_reply(ticket_id, email_body)
-        log(ticket_id, "email_sent", f"escalation summary emailed to client at {recipient_email}")
+        forward_ticket_summary(ticket_id, email_body, ESCALATION_NOTIFY_EMAIL)
+        log(ticket_id, "email_sent", f"escalation summary forwarded to {ESCALATION_NOTIFY_EMAIL}")
         return True
     except Exception as exc:
-        log(ticket_id, "error", f"send_email_reply failed: {exc}")
+        log(ticket_id, "error", f"forward_ticket_summary failed: {exc}")
         return False
 
 

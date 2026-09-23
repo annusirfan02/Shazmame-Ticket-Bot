@@ -2,8 +2,8 @@
 
 Freshdesk automation: adds a private "priority agency" note on new tickets for a specific
 company, and when that ticket is later tagged `escalate-unresolved`, generates a summary
-locally with the `sumy` library (no external AI API) and emails it to the customer through
-Freshdesk.
+locally with the `sumy` library (no external AI API) and forwards the ticket ID + chat
+summary to an internal notification address (not the customer) through Freshdesk.
 
 ## How it works
 
@@ -16,8 +16,9 @@ Freshdesk.
 3. On `ticket_updated`, the bot checks whether `escalate-unresolved` was *newly* added
    (present now, absent before) and the company matches, then fetches the full ticket +
    conversation history, summarizes it with `sumy`'s `LsaSummarizer` (falling back to the
-   raw description if summarization fails), and emails the summary to the client via
-   Freshdesk's reply endpoint.
+   raw description if summarization fails), and forwards the ticket (ID, subject, requester,
+   status, priority, chat summary) to `ESCALATION_NOTIFY_EMAIL` via Freshdesk's forward
+   endpoint. This does **not** email the customer.
 4. The webhook always returns `200 OK`, even on internal errors, so Freshdesk never retries
    delivery. Every action is logged as `TIMESTAMP TICKET-ID action description`.
 
@@ -38,7 +39,7 @@ Freshdesk account (default: `cf_relationship_id`).
 
 See [.env.example](.env.example). Required: `FRESHDESK_DOMAIN`, `FRESHDESK_API_KEY`.
 Optional: `TARGET_RELATIONSHIP_ID`, `FRESHDESK_RELATIONSHIP_FIELD_KEY`, `ESCALATION_TAG`,
-`SUMMARY_SENTENCE_COUNT`, `WEBHOOK_SECRET`.
+`ESCALATION_NOTIFY_EMAIL`, `SUMMARY_SENTENCE_COUNT`, `WEBHOOK_SECRET`.
 
 ## Setup
 

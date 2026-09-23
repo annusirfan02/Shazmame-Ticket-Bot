@@ -49,13 +49,26 @@ def add_private_note(ticket_id, content):
     return response.json()
 
 
-def send_email_reply(ticket_id, summary_text, client_name="Customer"):
-    """Send a formatted summary email to the client through Freshdesk's reply endpoint."""
+def send_email_reply(ticket_id, summary_text):
+    """Send a formatted summary email to the ticket's requester through Freshdesk's reply endpoint."""
     url = f"{_base_url()}/tickets/{ticket_id}/reply"
     response = requests.post(
         url,
         auth=_auth(),
         json={"body": summary_text},
+        timeout=20,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def forward_ticket_summary(ticket_id, summary_text, to_email):
+    """Forward the ticket summary to a specific internal email address (not the requester)."""
+    url = f"{_base_url()}/tickets/{ticket_id}/forward"
+    response = requests.post(
+        url,
+        auth=_auth(),
+        json={"body": summary_text, "to_emails": [to_email]},
         timeout=20,
     )
     response.raise_for_status()
