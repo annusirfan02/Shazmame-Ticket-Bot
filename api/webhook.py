@@ -130,10 +130,11 @@ def handle_ticket_updated(ticket_id, payload):
         summary_text = ticket.get("description_text") or ticket.get("description") or ""
 
     email_body = build_summary_email(ticket, summary_text)
+    recipient_email = (ticket.get("requester") or {}).get("email") or "unknown"
 
     try:
         send_email_reply(ticket_id, email_body)
-        log(ticket_id, "email_sent", "escalation summary emailed to client")
+        log(ticket_id, "email_sent", f"escalation summary emailed to client at {recipient_email}")
         return True
     except Exception as exc:
         log(ticket_id, "error", f"send_email_reply failed: {exc}")
